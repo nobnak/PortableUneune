@@ -9,11 +9,15 @@ using System.Collections.Generic;
 namespace UneuneSpots {
 
 	public class CPUHeightMap : MonoBehaviour {
+		public enum DebugModeEnum { None = 0, OnGUI }
+
 		public Vector4 texST = new Vector4(0.25f, 1f, 0f, 0f);
-		public Vector4 size = new Vector4(2f, 4f, 8f, 16f);
-		public Vector4 speed = new Vector4(0.01f, 0.01f, 0.01f, 0.01f);
-		public Vector4 gain = new Vector4(1.97f, 1.92f, 1.76f, -0.32f);
-		public Vector4 power = new Vector4(3.54f, 4.34f, 3.92f, 0.64f);
+		public Vector4 size = new Vector4(0.5f, 1.0f, 2.0f, 4.0f);
+		public Vector4 speed = new Vector4(0.003f, 0.003f, 0.003f, 0.003f);
+		public Vector4 gain = new Vector4(0.37f, 4.28f, 1.72f, -2.45f);
+		public Vector4 power = new Vector4(2.4f, 5.46f, 2.96f, 2.56f);
+
+		public Circle mask;
 
 		public CPUTexture NoiseMap { get; private set; }
 
@@ -21,7 +25,7 @@ namespace UneuneSpots {
 		public float generationInterval = 1f;
 
 		public float debugScale = 1f;
-		public KeyCode debugKey = KeyCode.U;
+		public DebugModeEnum debugMode;
 
 		private double _t;
 		private float _aspect;
@@ -32,7 +36,6 @@ namespace UneuneSpots {
 		private IEnumerator _iterator;
 		private volatile Thread _thread;
 
-		private int _debugMode = 0;
 		private Texture2D _debugTex;
 		private Color[] _debugPixels;
 
@@ -48,18 +51,18 @@ namespace UneuneSpots {
 			}
 		}
 		void Update() {
-			if (Input.GetKeyDown(debugKey)) {
-				_debugMode = ++_debugMode % 2;
+			if (!_iterator.MoveNext() && generationInterval < _timer.Elapsed.TotalSeconds) {
+				_iterator = Generate();
+				_timer.Reset();
+				_timer.Start();
 			}
-
-			if ((_iterator != null && _iterator.MoveNext()) || _timer.Elapsed.TotalSeconds < generationInterval)
-				return;
-			_iterator = Generate();
-			_timer.Reset();
-			_timer.Start();
+			if (debugMode != DebugModeEnum.None && Input.GetMouseButton(0)) {
+				var sspos = Camera.main.ScreenToViewportPoint(Input.mousePosition);
+				mask.offset = (Vector2)sspos;
+			}
 		}
 		void OnGUI() {
-			if (_debugMode > 0 && Event.current.type.Equals(EventType.Repaint)) {
+			if (debugMode == DebugModeEnum.OnGUI && Event.current.type.Equals(EventType.Repaint)) {
 				var screen = new Rect(0f, 0f, Screen.width, Screen.height);
 				_debugTex.SetPixels(_debugPixels);
 				_debugTex.Apply();
@@ -74,7 +77,6 @@ namespace UneuneSpots {
 				_thread = new Thread(Generator);
 			}
 
-			Debug.Log("Generate");
 			CheckTextures();
 			_t = TimeUtil.Time2014;
 			_thread.Start();
@@ -104,11 +106,12 @@ namespace UneuneSpots {
 						v3 = Mathf.Pow((float)(0.5 * (v3 + 1.0)), power.w);
 
 						var h = (float)(gain.x * v0 + gain.y * v1 + gain.z * v2 + gain.w * v3);
-						NoiseMap[x, y] = (h < 0f ? 0f : h);
+						h = (h < 0f ? 0f : h);
+						NoiseMap[x, y] = h * mask.Mask((float)(x * dx), (float)(y * dy));
 					}
 				}
 
-				if (_debugMode > 0) {
+				if (debugMode != DebugModeEnum.None) {
 					for (var y = 0; y < _height; y++) {
 						for (var x = 0; x < _width; x++) {
 							var i = x + y * _width;
@@ -141,6 +144,23 @@ namespace UneuneSpots {
 
 		void ReleaseTextures() {
 			Destroy(_debugTex);
+		}
+	}
+
+	[System.Serializable]
+	public class Circle {
+		public Vector2 size = new Vector2(0.1f, 0.1f);
+		public Vector2 center = new Vector2(0.5f, 0.5f);
+		public Vector2 offset = Vector2.zero;
+		
+		public float Mask(float u, float v) {
+			var rx = (u - center.x - offset.x) / size.x;
+			var ry = (v - center.y - offset.y) / size.y;
+			var sqDist = rx * rx + ry * ry;
+			if (sqDist <= 1f)
+				return 1f - sqDist;
+			else
+				return 0f;
 		}
 	}
 }

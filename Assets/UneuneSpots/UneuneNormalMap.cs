@@ -24,7 +24,7 @@ namespace UneuneSpots {
 		}
 		void Update() {
 			if (Input.GetKeyDown(debugKey)) {
-				_debugMode = ++_debugMode % 4;
+				_debugMode = ++_debugMode % 3;
 				Screen.showCursor = (_debugMode != 0);
 			}
 			ManualUpdate();
@@ -47,10 +47,14 @@ namespace UneuneSpots {
 			CheckTexture();
 			Graphics.Blit(null, _heightRTex, heightGenMat);
 			Graphics.Blit(_heightRTex, _normalRTex, normalGenMat);
-			
-			normalGenMat.SetFloat(ShaderConst.SHADER_UNEUNE_HEIGHT, height);
-			Shader.SetGlobalFloat(ShaderConst.SHADER_UNEUNE_HEIGHT, height);
-			Shader.SetGlobalTexture(ShaderConst.SHADER_UNEUNE_HEIGHT_MAP, _heightRTex);
+
+			var time = TimeUtil.ShaderTime2014;
+			Shader.SetGlobalVector(ShaderConst.DATE_TIME, time);
+			normalGenMat.SetFloat(ShaderConst.UNEUNE_HEIGHT, height);
+			Shader.SetGlobalFloat(ShaderConst.UNEUNE_HEIGHT, height);
+			Shader.SetGlobalTexture(ShaderConst.UNEUNE_HEIGHT_MAP, _heightRTex);
+			Shader.SetGlobalTexture(ShaderConst.UNEUNE_NORMAL_MAP, _normalRTex);
+
 		}
 		
 		void CheckTexture() {
