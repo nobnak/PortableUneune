@@ -3,12 +3,12 @@ using System.Collections;
 using nobnak.Texture;
 using System.Threading;
 using nobnak.Noise;
-using nobnak.Timer;
 using System.Collections.Generic;
 
 namespace UneuneSpots {
 
 	public class CPUHeightMap : MonoBehaviour {
+		public enum UpdateModeENum { Manual = 0, Auto }
 		public enum DebugModeEnum { None = 0, OnGUI }
 
 		public Vector4 texST = new Vector4(0.25f, 1f, 0f, 0f);
@@ -21,6 +21,7 @@ namespace UneuneSpots {
 
 		public CPUTexture NoiseMap { get; private set; }
 
+		public UpdateModeENum updateMode;
 		public int mipLevel = 3;
 		public float generationInterval = 1f;
 
@@ -40,8 +41,6 @@ namespace UneuneSpots {
 		private Color[] _debugPixels;
 
 		void OnEnable() {
-			_iterator = Generate();
-			_timer = System.Diagnostics.Stopwatch.StartNew();
 		}
 		void OnDisable() {
 			ReleaseTextures();
@@ -51,18 +50,26 @@ namespace UneuneSpots {
 			}
 		}
 		void Update() {
-			if (!_iterator.MoveNext() && generationInterval < _timer.Elapsed.TotalSeconds) {
-				_iterator = Generate();
-				_timer.Reset();
-				_timer.Start();
+			if (updateMode == UpdateModeENum.Auto) {
+				if (_iterator == null)
+					_iterator = Generate();
+				if (_timer == null)
+					_timer = System.Diagnostics.Stopwatch.StartNew();
+				if (!_iterator.MoveNext() && generationInterval < _timer.Elapsed.TotalSeconds) {
+					_iterator = Generate();
+					_timer.Reset();
+					_timer.Start();
+				}
 			}
+
 			if (debugMode != DebugModeEnum.None && Input.GetMouseButton(0)) {
 				var sspos = Camera.main.ScreenToViewportPoint(Input.mousePosition);
 				mask.offset = (Vector2)sspos;
 			}
 		}
 		void OnGUI() {
-			if (debugMode == DebugModeEnum.OnGUI && Event.current.type.Equals(EventType.Repaint)) {
+			if (debugMode == DebugModeEnum.OnGUI && _debugTex != null
+			    	&& Event.current.type.Equals(EventType.Repaint)) {
 				var screen = new Rect(0f, 0f, Screen.width, Screen.height);
 				_debugTex.SetPixels(_debugPixels);
 				_debugTex.Apply();
